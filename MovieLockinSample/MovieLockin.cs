@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using OpenCvSharp;
 
-namespace MovieLockin
+namespace MovieLockinClass
 {
     static class MovieLockin
     {
@@ -46,6 +46,14 @@ namespace MovieLockin
                 }
                 frameCount++;
             }
+
+
+            double maxValue;
+            Point maxLocation;
+            Cv2.MinMaxLoc(sumFrame, out _, out maxValue, out _, out maxLocation);
+
+            sumFrame *= 255.0 / maxValue;
+
             sumFrame.ConvertTo(sumFrame, MatType.CV_8UC1);
             frame.Dispose();
             return sumFrame;
@@ -142,6 +150,9 @@ namespace MovieLockin
             frameBrightness = frameBrightness.Select(x => (x - avg)).ToList();
             double sum = frameBrightness.Sum(x => Math.Abs(x));
             frameBrightness = frameBrightness.Select(x => x / sum).ToList();
+
+            avg = frameBrightness.Average();
+            sum = frameBrightness.Sum(x => Math.Abs(x));
 
             return frameBrightness;
 
