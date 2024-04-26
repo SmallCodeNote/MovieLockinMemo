@@ -10,6 +10,47 @@ namespace MovieLockin
 {
     static class MovieLockin
     {
+        static public Mat GetModulatedImage(string filename)
+        {
+            List<double> frameBrightness =  GetModulation( filename);
+
+            using (var capture = new VideoCapture(filename))
+            {
+                return GetModulatedImage(capture, frameBrightness);
+            }
+        }
+
+        static public Mat GetModulatedImage(VideoCapture capture, List<double> frameBrightness)
+        {
+            Mat frame = new Mat();
+            Mat sumFrame = new Mat();
+            int frameCount = 0;
+
+            while (true)
+            {
+                capture.Read(frame);
+                if (frame.Empty())
+                    break;
+
+                Cv2.CvtColor(frame, frame, ColorConversionCodes.BGR2GRAY);
+                frame.ConvertTo(frame, MatType.CV_64FC1);
+                frame = frame * frameBrightness[frameCount];
+
+                if (sumFrame.Empty())
+                {
+                    frame.CopyTo(sumFrame);
+                }
+                else
+                {
+                    Cv2.Add(sumFrame, frame, sumFrame);
+                }
+                frameCount++;
+            }
+            sumFrame.ConvertTo(sumFrame, MatType.CV_8UC1);
+            frame.Dispose();
+            return sumFrame;
+        }
+
         static public Mat GetModulationMask(string filename)
         {
             using (var capture = new VideoCapture(filename))
@@ -33,8 +74,8 @@ namespace MovieLockin
                     Cv2.CvtColor(frame, frame, ColorConversionCodes.BGR2GRAY);
                     if (minFrame.Empty())
                     {
-                        frame.CopyTo(minFrame);
-                        frame.CopyTo(maxFrame);
+                        frame.CopyTo(minFrame); minFrame.SetTo(255);
+                        frame.CopyTo(maxFrame); maxFrame.SetTo(0);
                     }
                     else
                     {
@@ -45,7 +86,11 @@ namespace MovieLockin
 
                 Mat mask = new Mat();
                 Cv2.Subtract(maxFrame, minFrame, mask);
-                Cv2.Threshold(mask, mask, 0, 255, ThresholdTypes.Binary);
+
+                double minVal, maxVal;
+                Cv2.MinMaxLoc(mask, out minVal, out maxVal);
+
+                Cv2.Threshold(mask, mask, maxVal / 2, 255, ThresholdTypes.Binary);
 
                 return mask;
             }
@@ -91,45 +136,16 @@ namespace MovieLockin
             }
 
             // Normalize the frameBrightness list
-            double sum = frameBrightness.Sum(x => Math.Abs(x));
             double avg = frameBrightness.Average();
             frameBrightness = frameBrightness.Select(x => x > avg ? 1.0 : -1.0).ToList();
             avg = frameBrightness.Average();
-            frameBrightness = frameBrightness.Select(x => (x - avg) / sum).ToList();
+            frameBrightness = frameBrightness.Select(x => (x - avg)).ToList();
+            double sum = frameBrightness.Sum(x => Math.Abs(x));
+            frameBrightness = frameBrightness.Select(x => x / sum).ToList();
 
             return frameBrightness;
 
         }
 
-        static public Mat GetModulatedImage(VideoCapture capture, List<double> frameBrightness)
-        {
-            Mat frame = new Mat();
-            Mat sumFrame = new Mat();
-            int frameCount = 0;
-
-            while (true)
-            {
-                capture.Read(frame);
-                if (frame.Empty())
-                    break;
-
-                Cv2.CvtColor(frame, frame, ColorConversionCodes.BGR2GRAY);
-                frame.ConvertTo(frame, MatType.CV_64FC1);
-                frame = frame * frameBrightness[frameCount];
-
-                if (sumFrame.Empty())
-                {
-                    frame.CopyTo(sumFrame);
-                }
-                else
-                {
-                    Cv2.Add(sumFrame, frame, sumFrame);
-                }
-                frameCount++;
-            }
-            sumFrame.ConvertTo(sumFrame, MatType.CV_8UC1);
-            frame.Dispose();
-            return sumFrame;
-        }
     }
 }
